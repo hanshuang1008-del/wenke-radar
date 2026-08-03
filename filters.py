@@ -118,6 +118,10 @@ def _match_keywords(job: JobItem) -> bool:
     exclude = getattr(config, "EXCLUDE_TITLE_KEYWORDS", [])
     if any(kw in job.title for kw in exclude):
         return False
+    # 关闭方向过滤时，允许目标城市内的所有非技术岗位进入结果；实习/届别/经验/资深
+    # 等其他画像规则仍由各自的过滤函数负责。
+    if not getattr(config, "FILTER_BY_DIRECTION", True):
+        return True
     text = f"{job.title} {job.category} {job.tags}"
     for cat_kw in config.CATEGORY_KEYWORDS:
         if cat_kw in job.category:
@@ -133,6 +137,10 @@ def _match_city(job: JobItem) -> bool:
     if not config.TARGET_CITIES:
         return True
     loc = job.location or ""
+    if getattr(config, "STRICT_TARGET_CITIES", False):
+        if not loc or "全国" in loc:
+            return False
+        return any(city in loc for city in config.TARGET_CITIES)
     if not loc or "全国" in loc:
         return True
     return any(city in loc for city in config.TARGET_CITIES)
