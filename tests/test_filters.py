@@ -152,3 +152,50 @@ class TestFilterSocial:
 
     def test_entry_level_kept(self):
         assert filter_jobs([job("内容运营", recruit_type="社招")])
+
+
+class TestPersonalProductProfile:
+    """Fork 的个人画像：只收产品岗，销售/BD/运营一律排除。"""
+
+    @staticmethod
+    def _enable(monkeypatch):
+        monkeypatch.setattr(config, "FILTER_BY_DIRECTION", True)
+        monkeypatch.setattr(config, "TARGET_DIRECTIONS", ["产品"])
+        monkeypatch.setattr(
+            config,
+            "EXCLUDE_TITLE_KEYWORDS",
+            list(config.EXCLUDE_TITLE_KEYWORDS)
+            + list(config.PRODUCT_PROFILE_EXCLUDE_TITLE_KEYWORDS),
+        )
+        monkeypatch.setattr(config, "TARGET_CITIES", ["上海", "北京", "杭州", "深圳", "广州"])
+        monkeypatch.setattr(config, "STRICT_TARGET_CITIES", True)
+        monkeypatch.setattr(config, "TARGET_GRAD_YEARS", [2027])
+        monkeypatch.setattr(config, "SOCIAL_MAX_EXPERIENCE_YEARS", 1)
+
+    def test_product_roles_kept(self, monkeypatch):
+        self._enable(monkeypatch)
+        jobs = [
+            job("2027届产品经理", location="上海"),
+            job("数据产品经理", location="北京", recruit_type="社招"),
+            job("产品策划", location="深圳", recruit_type="社招"),
+        ]
+        assert {j.title for j in filter_jobs(jobs)} == {j.title for j in jobs}
+
+    def test_sales_bd_operations_excluded(self, monkeypatch):
+        self._enable(monkeypatch)
+        jobs = [
+            job("产品运营", location="上海", recruit_type="社招"),
+            job("销售产品经理", location="北京", recruit_type="社招"),
+            job("产品BD", location="杭州", recruit_type="社招"),
+            job("内容运营", location="深圳", recruit_type="社招"),
+        ]
+        assert filter_jobs(jobs) == []
+
+    def test_other_directions_and_cities_excluded(self, monkeypatch):
+        self._enable(monkeypatch)
+        jobs = [
+            job("品牌营销经理", location="上海", recruit_type="社招"),
+            job("产品经理", location="成都", recruit_type="社招"),
+            job("产品经理", location="全国", recruit_type="社招"),
+        ]
+        assert filter_jobs(jobs) == []

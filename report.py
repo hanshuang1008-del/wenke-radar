@@ -11,7 +11,7 @@ from datetime import datetime, date
 from typing import List
 from domain.models import JobItem
 from domain.canonical import dedupe_cross_source
-from filters import filter_jobs, campus_year_bucket, campus_focus_years
+from filters import filter_jobs, campus_year_bucket, campus_focus_years, active_direction_names
 from scoring import score_job, star_threshold
 import config
 
@@ -170,7 +170,7 @@ def generate_brief(jobs: List[JobItem], new_keys: set, all_raw_count: dict,
     lines = []
     lines.append(f"# 📋 秋招雷达日报 · {today}")
     lines.append("")
-    focus_str = " / ".join(config.KEYWORDS.keys())
+    focus_str = " / ".join(active_direction_names()) or "未配置"
     year_str = getattr(config, "TARGET_YEAR_LABEL", "全部届别") if getattr(config, "ONLY_TARGET_YEAR", False) else "全部届别"
     intern_str = " ｜ 已排除实习岗" if getattr(config, "EXCLUDE_INTERN", False) else ""
     lines.append(f"> 自动抓取于 {now} ｜ {year_str}{intern_str} ｜ 关注方向：{focus_str} ｜ 目标城市：{('、'.join(config.TARGET_CITIES)) or '全国'}")
@@ -206,7 +206,7 @@ def generate_brief(jobs: List[JobItem], new_keys: set, all_raw_count: dict,
     _render_section(
         lines, "🎓 校招正式岗",
         f"面向应届的校招正式岗（已排除实习）｜方向：{focus_str}｜{year_str}｜"
-        f"**只报今日新增**，按 2026/2027/不限 分块；存量不铺",
+        f"**只报今日新增**，按目标届别/不限分块；存量不铺",
         campus_jobs, campus_counts, _sort_key,
         all_daily_only=True, year_split=True)
 

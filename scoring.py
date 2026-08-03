@@ -66,7 +66,9 @@ def score_job(job):
     score, reasons = _w("base"), []
 
     # 方向命中强度：命中一个关注方向 +15，多方向岗再 +5/个（封顶再加 2 个）
-    hits = [d for d in config.KEYWORDS if d in (job.category or "")]
+    enabled = getattr(config, "TARGET_DIRECTIONS", None)
+    direction_names = enabled if enabled is not None else config.KEYWORDS.keys()
+    hits = [d for d in direction_names if d in (job.category or "")]
     if hits:
         score += _w("direction_hit") + min(len(hits) - 1, 2) * _w("direction_extra")
         reasons.append("方向:" + "/".join(hits))

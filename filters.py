@@ -113,23 +113,31 @@ def _match_not_senior(job: JobItem) -> bool:
     return True
 
 
+def active_direction_names() -> List[str]:
+    """当前启用的方向名；未配置 TARGET_DIRECTIONS 时兼容原版的全部方向。"""
+    configured = getattr(config, "TARGET_DIRECTIONS", None)
+    if configured is None:
+        return list(config.KEYWORDS.keys())
+    return [name for name in configured if name in config.KEYWORDS]
+
+
 def _match_keywords(job: JobItem) -> bool:
-    """判断岗位是否命中关注方向（先排技术岗，再按类别命中，再按标题关键词兜底）。"""
+    """判断岗位是否命中启用方向（先排禁投标题，再按类别/标题关键词匹配）。"""
+    title_lower = (job.title or "").lower()
     exclude = getattr(config, "EXCLUDE_TITLE_KEYWORDS", [])
-    if any(kw in job.title for kw in exclude):
+    if any(str(kw).lower() in title_lower for kw in exclude):
         return False
-    # 关闭方向过滤时，允许目标城市内的所有非技术岗位进入结果；实习/届别/经验/资深
-    # 等其他画像规则仍由各自的过滤函数负责。
     if not getattr(config, "FILTER_BY_DIRECTION", True):
         return True
+
+    names = active_direction_names()
+    if not names:
+        return False
+    # 来源给出的类别只允许命中已启用方向，避免“运营/销售”等其他内置方向漏入。
+    if any(name in (job.category or "") for name in names):
+        return True
     text = f"{job.title} {job.category} {job.tags}"
-    for cat_kw in config.CATEGORY_KEYWORDS:
-        if cat_kw in job.category:
-            return True
-    all_kw = []
-    for kws in config.KEYWORDS.values():
-        all_kw.extend(kws)
-    return any(kw in text for kw in all_kw)
+    return any(kw in text for name in names for kw in config.KEYWORDS[name])
 
 
 def _match_city(job: JobItem) -> bool:
@@ -147,11 +155,12 @@ def _match_city(job: JobItem) -> bool:
 
 
 def _enrich_category(job: JobItem) -> JobItem:
-    """若 category 不含关注方向关键词，用 guess_category 从标题补充（只补关注方向，不加技术等）。"""
-    has_focus = any(kw in job.category for kw in config.CATEGORY_KEYWORDS)
+    """若 category 不含启用方向，用 guess_category 从标题补充启用方向标签。"""
+    names = active_direction_names()
+    has_focus = any(name in (job.category or "") for name in names)
     if not has_focus:
         guessed = guess_category(job.title)
-        focus_cats = [c for c in guessed.split("、") if c in config.KEYWORDS.keys()]
+        focus_cats = [c for c in guessed.split("、") if c in names]
         if focus_cats:
             existing = [c for c in job.category.split("、") if c] if job.category else []
             merged = list(dict.fromkeys(focus_cats + existing))
